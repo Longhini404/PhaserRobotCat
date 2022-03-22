@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>RobotCat</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+    <style type="text/css">
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <script type="text/javascript">
+      var config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+          default: "arcade",
+          arcade: {
+            gravity: { y: 400 },
+            debug: false,
+          },
+        },
+        scene: {
+          preload: preload,
+          create: create,
+          update: update,
+        },
+      };
+
+      var player;
+      var foods;
+      var robots;
+      var floors;
+      var cursors;
+      var scoreText;
+      var score = 0;
+      var gameOver = false;
+
+      var game = new Phaser.Game(config);
+
+      function preload() {
+        this.load.audio("music", ["assets/audio/longhini-seraphim.mp3"]);
+
+        this.load.image("sky", "assets/img/sky.png");
+        this.load.image("food", "assets/img/food.png");
+        this.load.image("robot", "assets/img/robot.png");
+        this.load.image("floor", "assets/img/floor.png");
+        this.load.spritesheet("cat", "assets/img/cat.png", {
+          frameWidth: 64,
+          frameHeight: 58,
+        });
+      }
+
+      function create() {
+        this.music = this.sound.add("music");
+
+        this.music.play();
+
+        //  Backfloor
+        this.add.image(400, 300, "sky");
+
+        //  Static Floot
+        floors = this.physics.add.staticGroup();
+
+        //  Floor
+        floors.create(400, 580, "floor").setScale(2).refreshBody();
+
+        //  Obstacles
+        floors.create(600, 250, "floor");
+        floors.create(100, 350, "floor");
+        floors.create(600, 450, "floor");
+
+        // Player & Settings
+        player = this.physics.add.sprite(100, 450, "cat");
+
+        // Player Physics
+        player.setBounce(0.2);
+        player.setCollideWorldBounds(true);
+
+        //  Player animations and movements
+        this.anims.create({
+          key: "turn",
+          frameRate: 20,
+          frames: [{ key: "cat", frame: 0 }],
+        });
+
+        this.anims.create({
+          repeat: -1,
+          key: "left",
+          frameRate: 10,
+          frames: this.anims.generateFrameNumbers("cat", { foodt: 0, end: 0 }),
+        });
+
+        this.anims.create({
+          repeat: -1,
+          key: "right",
+          frameRate: 10,
+          frames: this.anims.generateFrameNumbers("cat", { foodt: 0, end: 0 }),
+        });
+
+        //  Events
+        cursors = this.input.keyboard.createCursorKeys();
+
+        //  Foods to collect
+        foods = this.physics.add.group({
+          key: "food",
+          repeat: 11,
+          setXY: { x: 12, y: 0, stepX: 69 },
+        });
+
+        foods.children.iterate(function (child) {
+          //  Food bounce
+          child.setBounceY(Phaser.Math.FloatBetween(0.2, 0.4));
+        });
+
+        robots = this.physics.add.group();
+
+        //  Scoreboard
+        scoreText = this.add.text(16, 16, "FOOD: 0", {
+          fill: "#000",
+          fontSize: "32px",
+        });
+
+        //  Physical collision
+        this.physics.add.collider(foods, floors);
+        this.physics.add.collider(player, floors);
+        this.physics.add.collider(robots, floors);
+
+        //  Player & foods
+        this.physics.add.overlap(player, foods, collectFood, null, this);
+
+        this.physics.add.collider(player, robots, hitRobot, null, this);
+      }
+
+      //Game over
+      function update() {
+        if (gameOver) {
+          return;
+        }
+
+        if (cursors.left.isDown) {
+          player.setVelocityX(-160);
+
+          player.anims.play("left", true);
+        } else if (cursors.right.isDown) {
+          player.setVelocityX(160);
+
+          player.anims.play("right", true);
+        } else {
+          player.setVelocityX(0);
+
+          player.anims.play("turn");
+        }
+
+        if (cursors.up.isDown && player.body.touching.down) {
+          player.setVelocityY(-330);
+        }
+      }
+
+      function collectFood(player, food) {
+        food.disableBody(true, true);
+
+        //  Score & update
+        score += 10;
+        scoreText.setText("Food: " + score);
+
+        if (foods.countActive(true) === 0) {
+          //  New foods to collect
+          foods.children.iterate(function (child) {
+            child.enableBody(true, child.x, 0, true, true);
+          });
+
+          var x =
+            player.x < 400
+              ? Phaser.Math.Between(400, 800)
+              : Phaser.Math.Between(0, 400);
+
+          var robot = robots.create(x, 16, "robot");
+          robot.setBounce(1);
+          robot.allowGravity = false;
+          robot.setCollideWorldBounds(true);
+          robot.setVelocity(Phaser.Math.Between(-200, 200), 20);
+        }
+      }
+
+      // Damage
+      function hitRobot(player, robot) {
+        this.physics.pause();
+
+        player.setTint(0xff0000);
+
+        player.anims.play("turn");
+
+        gameOver = true;
+      }
+    </script>
+  </body>
+</html>
